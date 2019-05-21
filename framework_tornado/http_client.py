@@ -94,3 +94,27 @@ if __name__ == '__main__':
     # io_loop.start()
     pass
 
+"""
+    Tornado 异步请求 - 协程函数 - 等待多个异步调用
+    
+    Tornado 允许使用 yield 在多个异步调用中，
+    只需要将这些调用以 list 或 dict 的方式传递给 yield
+"""
+
+@gen.coroutine
+def async_visit_contains_more_wait_by_coroutine():
+    http_client = AsyncHTTPClient()
+    res_list = yield [
+        http_client.fetch('http://httpbin.org/ip'),
+        http_client.fetch('https://www.baidu.com'),
+        http_client.fetch('https://www.163.com'),
+        http_client.fetch('http://127.0.0.1/now')
+    ]
+    for res in res_list:
+        print(res.body)
+
+
+if __name__ == '__main__':
+    # io_loop = ioloop.IOLoop.current()
+    # io_loop.run_sync(async_visit_contains_more_wait_by_coroutine)
+    pass
