@@ -4,6 +4,7 @@
 
 import json
 import cgi
+import uuid
 import tornado.web
 import tornado.gen
 import tornado.httpclient
@@ -83,6 +84,8 @@ class DateHandler(tornado.web.RequestHandler):
     重写 RequestHandler.initialize 函数
     参数在 Application 定义 URL 映射时以 dict 方式给出
     （具体参考 RequestHandler.initialize 文档注释）
+    
+    注意：RequestHandler.initialize 在每次 RequestHandler 子孙类初始化时都会被调用
 """
 
 
@@ -268,6 +271,7 @@ class AsyncHandler(tornado.web.RequestHandler):
 
 
 class AsyncSSRHandler(tornado.web.RequestHandler):
+    # 以网站转发为例
 
     @tornado.web.asynchronous
     def get(self):
@@ -279,7 +283,164 @@ class AsyncSSRHandler(tornado.web.RequestHandler):
             raise tornado.web.HTTPError(500)
         self.write(response.body)
         self.finish()
-        
+
+
+"""
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+    协程化处理
+
+    @tornado.gen.coroutine 装饰器同样可以将接入点函数由同步变为异步
+    既满足了异步处理又符合同步编程风格
+    （协程化处理无需使用 RequestHandler.finish）
+    
+    要点：
+        1.使用 @tornado.gen.coroutine 装饰接入点函数
+        2.使用异步对象来处理一些耗时的操作，比如使用 AsyncHTTPClient 请求
+        3.调用 yield 关键字来获取异步对象的处理结果
+"""
+
+
+class CoroutineHandler(tornado.web.RequestHandler):
+
+    @tornado.gen.coroutine
+    def get(self):
+        http = tornado.httpclient.AsyncHTTPClient()
+        response = yield http.fetch('http://httpbin.org/ip')
+        self.write(response.body)
+
+
+"""
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+    身份验证 - Cookie 机制
+   
+   RequestHandler.get_cookie 获取指定的 Cookies
+   （获取 HTTP 请求头的 Cookies）
+   
+   RequestHandler.set_cookie 设置指定的 Cookies
+   （设置 HTTP 响应头的 Set-Cookies）
+   
+   RequestHandler.clear_cookie 清除指定的 Cookies
+   （将 HTTP 请求头的 Cookies 指定的值清除为空白并设置在响应头的 Set-Cookies ）
+   
+   
+   注意：RequestHandler.get_cookie 返回类型是 bytes 不是 str
+"""
+
+SESSION_ID = 0
+REQUEST_COUNT = 0
+
+
+class AuthCookiesHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        global SESSION_ID
+        global REQUEST_COUNT
+        REQUEST_COUNT += 1
+        if not self.get_cookie('session'):
+            SESSION_ID += 1
+            self.set_cookie('session', str(SESSION_ID))
+            self.write('Session ID get new one.')
+        elif REQUEST_COUNT % 3 == 0:
+            self.clear_cookie('session')
+            self.write('Session ID clear.')
+        else:
+            self.write('Session ID was set.')
+
+
+"""
+
+    身份验证 - 安全 Cookie 机制
+
+    
+    tornado.web.Application 的 cookie_secret 参数可以赋予 Cookies 加盐加密的效果，使 Cookies 难以被伪造
+    但需要结合 RequestHandler.get_secure_cookie 和 RequestHandler.set_secure_cookie 来使用 
+
+    要点：
+        1.tornado.web.Application 对象初始化时需要 cookie_secret 参数，该参数作为 Cookies 加密的密钥
+        2.读取 Cookies 时，使用 RequestHandler.get_secure_cookie 代替 RequestHandler.get_cookie
+        3.写入 Cookies 时，使用 RequestHandler.set_secure_cookie 代替 RequestHandler.set_cookie
+
+"""
+COOKIES_SECRET = 'SALT'
+
+
+class AuthSecretCookiesHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        global SESSION_ID
+        global REQUEST_COUNT
+        REQUEST_COUNT += 1
+        if not self.get_secure_cookie('session'):
+            SESSION_ID += 1
+            self.set_secure_cookie('session', str(SESSION_ID))
+            self.write('Session ID get new one.')
+        elif REQUEST_COUNT % 3 == 0:
+            self.clear_cookie('session')
+            self.write('Session ID clear.')
+        else:
+            self.write('Session ID was set.')
+
+
+# TODO：还需要理清用户身份认证代码的逻辑
+"""
+
+    身份验证 - 用户身份认证
+    
+"""
+SESSION_MAP = dict()
+
+
+class BaseHandler(tornado.web.RequestHandler):
+
+    def get_current_user(self):
+        global SESSION_MAP
+        session_id = self.get_secure_cookie('session_id')
+        session_id = session_id.decode()
+        current_user = SESSION_MAP.get(session_id)
+        return current_user
+
+
+class NeedAuthHandler(BaseHandler):
+
+    @tornado.web.authenticated
+    def get(self):
+        current_user = self.current_user
+        user_name = tornado.web.escape.xhtml_escape(current_user)
+        self.write('Hi, this is %s' % user_name)
+
+    # 以下函数功能与使用 @tornado.web.authenticated 一样
+    # def get(self):
+    #     current_user = self.get_current_user()
+    #     if not current_user:
+    #         self.redirect("/login")
+    #         return
+    #     user_name = tornado.web.escape.xhtml_escape(current_user)
+    #     self.write('Hi, this is %s' % user_name)
+
+
+class LoginHandler(BaseHandler):
+
+    def get(self):
+        login_from = '<form action="/login" method="post">' \
+                     'Name: <input type="text" name="name">' \
+                     '<input type="submit" name="Sign in">' \
+                     '</form>'
+        html = '<html><body>%s</body></html>' % login_from
+        self.write(html)
+
+    def post(self):
+        global SESSION_MAP
+        name = self.get_argument('name')
+        if len(name) <= 3:
+            self.redirect('/login')
+        else:
+            session_id = str(uuid.uuid1())
+            SESSION_MAP[session_id] = name
+            self.set_secure_cookie('session_id', session_id)
+            self.redirect('/need-auth')
+
 
 if __name__ == '__main__':
     # 路由解析
@@ -311,9 +472,22 @@ if __name__ == '__main__':
         ('/async', AsyncHandler),
         ('/async-ssr', AsyncSSRHandler),
 
+        # 协程化处理
+        ('/coroutine', CoroutineHandler),
+
+        # 身份验证 - Cookie 机制
+        ('/auth-cookies', AuthCookiesHandler),
+        # 身份验证 - 安全 Cookie 机制
+        ('/auth-sec-cookies', AuthSecretCookiesHandler),
+        # 身份验证 - 用户身份认证
+        ('/login', LoginHandler),
+        ('/need-auth', NeedAuthHandler),
+
     ]
-    app = tornado.web.Application(route_sheet)
-    port = 8080
+    app = tornado.web.Application(route_sheet,
+                                  cookie_secret=COOKIES_SECRET,
+                                  login_url='/login')
+    port = 8888
     app.listen(port=port)
     print('Tornado web server listen to %d port.' % port)
     tornado.ioloop.IOLoop.current().start()
