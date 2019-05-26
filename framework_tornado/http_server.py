@@ -383,27 +383,36 @@ class AuthSecretCookiesHandler(tornado.web.RequestHandler):
             self.write('Session ID was set.')
 
 
-# TODO：还需要理清用户身份认证代码的逻辑
 """
 
     身份验证 - 用户身份认证
     
+    
 """
+
+# 存储已进行身份认证的用户 UUID 映射关系
+# 这些 UUID 必须与 Cookies 关联, 才能够标识请求的认证状态
 SESSION_MAP = dict()
 
 
+# 继承 RequestHandler 并重写 get_current_user 方法
 class BaseHandler(tornado.web.RequestHandler):
 
     def get_current_user(self):
+        # get_current_user 根据 Cookies 获取当前会话对应的用户身份
         global SESSION_MAP
         session_id = self.get_secure_cookie('session_id')
         session_id = session_id.decode()
         current_user = SESSION_MAP.get(session_id)
         return current_user
 
-
+# 模拟需要用户身份认证才能访问的页面
 class NeedAuthHandler(BaseHandler):
 
+    # tornado.web.authenticated 装饰器
+    # 用于检查当前 RequestHandler.current_user 是否存在, 即本次请求是否已经通过用户身份认证
+    # 若通过则执行被装饰的接入点函数, 否则将重定向到 tornado.web.Application 制定的 login_url
+    # （具体逻辑可参考 tornado.web.authenticated 文档注释）
     @tornado.web.authenticated
     def get(self):
         current_user = self.current_user
@@ -419,9 +428,10 @@ class NeedAuthHandler(BaseHandler):
     #     user_name = tornado.web.escape.xhtml_escape(current_user)
     #     self.write('Hi, this is %s' % user_name)
 
-
+# 模拟登录页面
 class LoginHandler(BaseHandler):
 
+    # 收到 GET 请求返回用户身份验证页面
     def get(self):
         login_from = '<form action="/login" method="post">' \
                      'Name: <input type="text" name="name">' \
@@ -430,6 +440,9 @@ class LoginHandler(BaseHandler):
         html = '<html><body>%s</body></html>' % login_from
         self.write(html)
 
+    # 收到 POST 进行用户身份认证
+    # 认证成功则生成当前用户的 UUID 并保存, 还需要与 Cookies 关联, 然后再跳转到制定页面
+    # 认证失败则依然跳转到 login_url
     def post(self):
         global SESSION_MAP
         name = self.get_argument('name')
@@ -486,7 +499,8 @@ if __name__ == '__main__':
     ]
     app = tornado.web.Application(route_sheet,
                                   cookie_secret=COOKIES_SECRET,
-                                  login_url='/login')
+                                  login_url='/login',
+                                  debug=True)
     port = 8888
     app.listen(port=port)
     print('Tornado web server listen to %d port.' % port)
