@@ -12,6 +12,16 @@ import tornado.ioloop
 from datetime import datetime
 
 """
+    tornado.options 模块可用于从命令行读取配置
+    tornado.options.define  定义参数类型, 默认值和参数说明
+    tornado.options.options 获取命令行传入的参数
+"""
+
+from tornado.options import define, options
+
+define(name='port', default=8888, help='Run on this port', type=int)
+
+"""
     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
     路由解析 - 固定字符串路径
@@ -255,6 +265,30 @@ class OutputResHandler(tornado.web.RequestHandler):
 """
     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
+    异常处理
+    
+    重写 RequestHandler.write_error 函数可自定义该路由下各种异常状态码的处理逻辑
+
+"""
+
+
+class ErrorBackHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        greeting = self.get_argument('greeting', 'Hi')
+        name = self.get_argument('name')
+        self.write("%s, %s." % (greeting, name))
+
+    def write_error(self, status_code, **kwargs):
+        if status_code == 400:
+            self.write('Error, Bad Request (argument "name" must be assigned).')
+        else:
+            self.write('Error, Other untreated status code %s.' % status_code)
+
+
+"""
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
     异步化处理
     
     @tornado.web.asynchronous 装饰器可以将接入点函数由同步变为异步
@@ -263,7 +297,7 @@ class OutputResHandler(tornado.web.RequestHandler):
 
 
 class AsyncHandler(tornado.web.RequestHandler):
-    
+
     @tornado.web.asynchronous
     def get(self):
         self.write('Async')
@@ -406,6 +440,7 @@ class BaseHandler(tornado.web.RequestHandler):
         current_user = SESSION_MAP.get(session_id)
         return current_user
 
+
 # 模拟需要用户身份认证才能访问的页面
 class NeedAuthHandler(BaseHandler):
 
@@ -427,6 +462,7 @@ class NeedAuthHandler(BaseHandler):
     #         return
     #     user_name = tornado.web.escape.xhtml_escape(current_user)
     #     self.write('Hi, this is %s' % user_name)
+
 
 # 模拟登录页面
 class LoginHandler(BaseHandler):
@@ -481,6 +517,9 @@ if __name__ == '__main__':
         # 输出响应函数 - 解析参数
         ('/output-res', OutputResHandler),
 
+        # 异常处理
+        ('/errorback/greet', ErrorBackHandler),
+
         # 异步化处理
         ('/async', AsyncHandler),
         ('/async-ssr', AsyncSSRHandler),
@@ -497,11 +536,16 @@ if __name__ == '__main__':
         ('/need-auth', NeedAuthHandler),
 
     ]
-    app = tornado.web.Application(route_sheet,
-                                  cookie_secret=COOKIES_SECRET,
-                                  login_url='/login',
-                                  debug=True)
-    port = 8888
-    app.listen(port=port)
-    print('Tornado web server listen to %d port.' % port)
-    tornado.ioloop.IOLoop.current().start()
+    app = tornado.web.Application(
+        # handlers 指明路由以及对应的 RequestHandler 子类
+        handlers=route_sheet,
+        # cookie_secret 作为 Cookies 加密的密钥
+        cookie_secret=COOKIES_SECRET,
+        # login_url 设置身份认证页面
+        login_url='/login',
+        # debug 为 True 时, 修改代码会使服务器重启
+        debug=True
+    )
+    app.listen(port=options.port)
+    print('Tornado web server listen to %d port.' % options.port)
+    tornado.ioloop.IOLoop.instance().start()
