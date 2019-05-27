@@ -2,6 +2,7 @@
 # author: BergChen
 # date: 2019/5/21
 
+import os
 import json
 import cgi
 import uuid
@@ -421,7 +422,6 @@ class AuthSecretCookiesHandler(tornado.web.RequestHandler):
 
     身份验证 - 用户身份认证
     
-    
 """
 
 # 存储已进行身份认证的用户 UUID 映射关系
@@ -463,7 +463,6 @@ class NeedAuthHandler(BaseHandler):
     #     user_name = tornado.web.escape.xhtml_escape(current_user)
     #     self.write('Hi, this is %s' % user_name)
 
-
 # 模拟登录页面
 class LoginHandler(BaseHandler):
 
@@ -489,6 +488,31 @@ class LoginHandler(BaseHandler):
             SESSION_MAP[session_id] = name
             self.set_secure_cookie('session_id', session_id)
             self.redirect('/need-auth')
+
+
+"""
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+    表单与模板
+
+"""
+
+class PoemIndexHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.render('poem-index.html')
+
+class PoemPageHandler(tornado.web.RequestHandler):
+    def post(self):
+        noun1 = self.get_argument('noun1')
+        noun2 = self.get_argument('noun2')
+        verb = self.get_argument('verb')
+        noun3 = self.get_argument('noun3')
+        self.render('poem-page.html',
+                    roads=noun1,
+                    wood=noun2,
+                    made=verb,
+                    difference=noun3)
 
 
 if __name__ == '__main__':
@@ -535,10 +559,23 @@ if __name__ == '__main__':
         ('/login', LoginHandler),
         ('/need-auth', NeedAuthHandler),
 
+        # 表单与模板
+        ('/poem-index', PoemIndexHandler),
+        ('/poem-page', PoemPageHandler),
+
     ]
+
+    # 模板文件目录
+    template_path = os.path.join(
+        os.path.dirname(__file__),
+        'templates'
+    )
+
     app = tornado.web.Application(
         # handlers 指明路由以及对应的 RequestHandler 子类
         handlers=route_sheet,
+        # template_path 指明模板文件所在目录
+        template_path=template_path,
         # cookie_secret 作为 Cookies 加密的密钥
         cookie_secret=COOKIES_SECRET,
         # login_url 设置身份认证页面
