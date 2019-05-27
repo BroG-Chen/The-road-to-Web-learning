@@ -10,6 +10,7 @@ import tornado.web
 import tornado.gen
 import tornado.httpclient
 import tornado.ioloop
+import tornado.template
 from datetime import datetime
 
 """
@@ -495,12 +496,25 @@ class LoginHandler(BaseHandler):
     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
     表单与模板
+    
+    tornado.web.Application 的 template_path 参数指明模板所在目录
+    RequestHandler.render 从模板目录读取指定模板并按传入参数进行填充
+    
+    tornado.template.Template 类也可以用于生成模板
 
 """
 
 class PoemIndexHandler(tornado.web.RequestHandler):
     def get(self):
-        self.render('poem-index.html')
+        number = self.get_argument('number', '1')
+        if int(number) == 1:
+            self.render(template_name='poem-index.html',
+                        route='/poem-page',
+                        number=1)
+        else:
+            self.render(template_name='poem-index.html',
+                        route='/poem-page-temp',
+                        number=2)
 
 class PoemPageHandler(tornado.web.RequestHandler):
     def post(self):
@@ -513,6 +527,37 @@ class PoemPageHandler(tornado.web.RequestHandler):
                     wood=noun2,
                     made=verb,
                     difference=noun3)
+
+class PoemPageTempHandler(tornado.web.RequestHandler):
+    def post(self):
+        noun1 = self.get_argument('noun1')
+        noun2 = self.get_argument('noun2')
+        verb = self.get_argument('verb')
+        noun3 = self.get_argument('noun3')
+        html_temp = \
+        """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Poem Maker Pro 2</title>
+        </head>
+        <body>
+        <h1>Your poem 2</h1>
+        <p>
+            Two {{roads}} diverged in a {{wood}}, and I—<br>
+            I took the one less travelled by,<br>
+            And that has {{made}} all the {{difference}}.
+        </p>
+        </body>
+        </html>
+        """
+        temp = tornado.template.Template(template_string=html_temp)
+        content = temp.generate(roads=noun1,
+                                wood=noun2,
+                                made=verb,
+                                difference=noun3)
+        self.write(content)
 
 
 if __name__ == '__main__':
@@ -562,6 +607,7 @@ if __name__ == '__main__':
         # 表单与模板
         ('/poem-index', PoemIndexHandler),
         ('/poem-page', PoemPageHandler),
+        ('/poem-page-temp', PoemPageTempHandler),
 
     ]
 
