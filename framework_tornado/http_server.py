@@ -464,6 +464,7 @@ class NeedAuthHandler(BaseHandler):
     #     user_name = tornado.web.escape.xhtml_escape(current_user)
     #     self.write('Hi, this is %s' % user_name)
 
+
 # 模拟登录页面
 class LoginHandler(BaseHandler):
 
@@ -495,7 +496,7 @@ class LoginHandler(BaseHandler):
 
     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
-    表单与模板
+    表单与模板 - 渲染与填充
     
     tornado.web.Application 的 template_path 参数指明模板所在目录
     RequestHandler.render 从模板目录读取指定模板并按传入参数进行填充
@@ -504,7 +505,9 @@ class LoginHandler(BaseHandler):
 
 """
 
+
 class PoemIndexHandler(tornado.web.RequestHandler):
+
     def get(self):
         number = self.get_argument('number', '1')
         if int(number) == 1:
@@ -516,7 +519,9 @@ class PoemIndexHandler(tornado.web.RequestHandler):
                         route='/poem-page-temp',
                         number=2)
 
+
 class PoemPageHandler(tornado.web.RequestHandler):
+
     def post(self):
         noun1 = self.get_argument('noun1')
         noun2 = self.get_argument('noun2')
@@ -528,7 +533,9 @@ class PoemPageHandler(tornado.web.RequestHandler):
                     made=verb,
                     difference=noun3)
 
+
 class PoemPageTempHandler(tornado.web.RequestHandler):
+
     def post(self):
         noun1 = self.get_argument('noun1')
         noun2 = self.get_argument('noun2')
@@ -558,6 +565,70 @@ class PoemPageTempHandler(tornado.web.RequestHandler):
                                 made=verb,
                                 difference=noun3)
         self.write(content)
+
+
+"""
+
+    表单与模板 - 填充表达式
+
+"""
+
+
+class ExpressionTempHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        html_temp = \
+        """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Expression</title>
+        </head>
+        <body>
+        <p>
+            {{ 1 + 2 }}<br>
+            {{ ', '.join([i for i in range(10)]) }}<br>
+        </p>
+        </body>
+        </html>
+        """
+        temp = tornado.template.Template(template_string=html_temp)
+        self.write(temp)
+
+
+"""
+
+    表单与模板 - 控制流语句
+
+    语句块以 "{%" 开始 "%}" 结束
+"""
+
+class ControlFlowTempHandler(tornado.web.RequestHandler):
+
+    def get(self):
+
+        html_temp = \
+        """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Control Flow</title>
+        </head>
+        <body>
+        <p>
+            <ul>
+                {% for index in range(10) %}
+                    <li>{{ index }}</li>
+                {% end %}
+            </ul>
+        </p>
+        </body>
+        </html>
+        """
+        temp = tornado.template.Template(template_string=html_temp)
+        self.write(temp)
 
 
 if __name__ == '__main__':
@@ -604,10 +675,14 @@ if __name__ == '__main__':
         ('/login', LoginHandler),
         ('/need-auth', NeedAuthHandler),
 
-        # 表单与模板
+        # 表单与模板 - 渲染与填充
         ('/poem-index', PoemIndexHandler),
         ('/poem-page', PoemPageHandler),
         ('/poem-page-temp', PoemPageTempHandler),
+        # 表单与模板 - 填充表达式
+        ('/exp-temp', ExpressionTempHandler),
+        # 表单与模板 - 控制流语句
+        ('/ctlflow-temp', ControlFlowTempHandler),
 
     ]
 
