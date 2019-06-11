@@ -594,7 +594,8 @@ class ExpressionTempHandler(tornado.web.RequestHandler):
         </html>
         """
         temp = tornado.template.Template(template_string=html_temp)
-        self.write(temp)
+        content = temp.generate()
+        self.write(content)
 
 
 """
@@ -603,6 +604,7 @@ class ExpressionTempHandler(tornado.web.RequestHandler):
 
     语句块以 "{%" 开始 "%}" 结束
 """
+
 
 class ControlFlowTempHandler(tornado.web.RequestHandler):
 
@@ -619,7 +621,7 @@ class ControlFlowTempHandler(tornado.web.RequestHandler):
         <body>
         <p>
             <ul>
-                {% for index in range(10) %}
+                {% for index in index_list %}
                     <li>{{ index }}</li>
                 {% end %}
             </ul>
@@ -628,7 +630,64 @@ class ControlFlowTempHandler(tornado.web.RequestHandler):
         </html>
         """
         temp = tornado.template.Template(template_string=html_temp)
-        self.write(temp)
+        content = temp.generate()
+        self.write(content)
+
+
+"""
+
+    表单与模板 - 模板函数
+
+    Tornado 在所有模板中默认提供 4 个便利的函数
+        escape      ：将字符串中的敏感字符（类似 &、<、>）转换为 HTML 编码
+                      所有模板输出默认都会使用 escape，除非在 tornado.web.Application 的 autoescape 参数指明 None
+        url_escape  ：对字符串进行 URL 编码
+        json_encode ：相当于调用 json 库的 dumps 函数
+        squeeze     ：将字符串中连续的多个空白字符替换成一个空格
+        
+    除以上 Tornado 自带函数外，也可以自己编写需要的函数
+    只需要将函数名作为模板参数传递即可
+"""
+
+
+class FunctionTempHandler(tornado.web.RequestHandler):
+
+    def get(self):
+
+        html_temp = \
+        """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Function</title>
+        </head>
+        <body>
+            <p><a href="#">test_a</a> <br>{{ '<a href="#">test_a</a>' }}</p>
+            <br>
+            <p>http://127.0.0.1?q={{ url_escape('测试') }}</p>
+            <br>
+            <p>{{ json_encode(json_data) }}</p>
+            <br>
+            <p>{{ squeeze('Lots  of   Spaces    .') }}</p>
+            <br>
+            <p>{{ custom_func('Hi') }}</p>
+        </body>
+        </html>
+        """
+
+        def custom_func(text):
+            return text + '!!!'
+
+        json_data = {
+            'name': 'Test',
+            'age': 20
+        }
+
+        temp = tornado.template.Template(template_string=html_temp)
+        content = temp.generate(custom_func=custom_func,
+                                json_data=json_data)
+        self.write(content)
 
 
 if __name__ == '__main__':
@@ -683,6 +742,8 @@ if __name__ == '__main__':
         ('/exp-temp', ExpressionTempHandler),
         # 表单与模板 - 控制流语句
         ('/ctlflow-temp', ControlFlowTempHandler),
+        # 表单与模板 - 模板函数
+        ('/func-temp', FunctionTempHandler),
 
     ]
 
