@@ -502,6 +502,9 @@ class LoginHandler(BaseHandler):
     RequestHandler.render 从模板目录读取指定模板并按传入参数进行填充
     
     tornado.template.Template 类也可以用于生成模板
+    
+    要点：
+        1、“{{” 和 “}}” 括起来的内容可以是变量或者表达式
 
 """
 
@@ -690,6 +693,58 @@ class FunctionTempHandler(tornado.web.RequestHandler):
         self.write(content)
 
 
+"""
+
+    模板扩展 - 模板继承
+
+    Tornado 通过 extends 和 block 语句支持模板继承
+    父模板中的 block 会被子模板中的同名 block 所覆盖
+    
+    要点：
+        1、父模板中定义 block
+        2、子模板使用 extends 继承父模板，并使用同名 block 重写父模板中的 block 内容
+    
+"""
+
+
+class TempInheritHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        inherit = self.get_argument('inherit', '0')
+        if inherit == '0':
+            self.render(template_name='inherit/block-page.html')
+        else:
+            self.render(template_name='inherit/block-sub-page.html')
+
+
+"""
+
+    模板扩展 - UI 模块
+
+    UI 模块是封装模板中包含的标记、样式以及行为（HTML、CSS 以及 JS）的可复用组件
+    
+    
+    
+    tornado.web.Application 的 template_path 参数指明模板所在目录
+    
+    要点：
+        1、定义 UIModuleJS 子类
+        2、template_path 中定义模板的映射
+
+"""
+
+
+class UIModuleJS(tornado.web.UIModule):
+    def render(self):
+        return '<script>alert("Hi")</script>'
+
+
+class UIModuleHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        self.render(template_name='ui-module/js.html')
+
+
 if __name__ == '__main__':
     # 路由解析
     route_sheet = [
@@ -745,6 +800,11 @@ if __name__ == '__main__':
         # 表单与模板 - 模板函数
         ('/func-temp', FunctionTempHandler),
 
+        # 模板扩展 - 模板继承
+        ('/inherit-temp', TempInheritHandler),
+        # 模板扩展 - UI 模块
+        ('/ui-module-temp', UIModuleHandler),
+
     ]
 
     # 模板文件目录
@@ -753,11 +813,17 @@ if __name__ == '__main__':
         'templates'
     )
 
+    ui_modules_sheet = {
+        'JS_TEST': UIModuleJS,
+    }
+
     app = tornado.web.Application(
         # handlers 指明路由以及对应的 RequestHandler 子类
         handlers=route_sheet,
         # template_path 指明模板文件所在目录
         template_path=template_path,
+        # ui_modules 指明模板中 UI 模块 module 对应的 tornado.web.UIModule 子类
+        ui_modules=ui_modules_sheet,
         # cookie_secret 作为 Cookies 加密的密钥
         cookie_secret=COOKIES_SECRET,
         # login_url 设置身份认证页面
