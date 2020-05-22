@@ -509,6 +509,12 @@ class LoginHandler(BaseHandler):
 """
 
 
+class IndexHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        self.render(template_name='index.html')
+
+
 class PoemIndexHandler(tornado.web.RequestHandler):
 
     def get(self):
@@ -790,6 +796,7 @@ if __name__ == '__main__':
         ('/need-auth', NeedAuthHandler),
 
         # 表单与模板 - 渲染与填充
+        ('/index', IndexHandler),
         ('/poem-index', PoemIndexHandler),
         ('/poem-page', PoemPageHandler),
         ('/poem-page-temp', PoemPageTempHandler),
